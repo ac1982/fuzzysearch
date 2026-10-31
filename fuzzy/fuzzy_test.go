@@ -74,7 +74,7 @@ func TestFuzzyMatchFold(t *testing.T) {
 }
 
 func TestFuzzyMatchNormalized(t *testing.T) {
-	var normalizedTests = []struct {
+	normalizedTests := []struct {
 		source string
 		target string
 		wanted bool
@@ -95,7 +95,7 @@ func TestFuzzyMatchNormalized(t *testing.T) {
 }
 
 func TestFuzzyMatchNormalizedFold(t *testing.T) {
-	var normalizedTests = []struct {
+	normalizedTests := []struct {
 		source string
 		target string
 		wanted bool
@@ -177,7 +177,7 @@ func TestRankMatch(t *testing.T) {
 }
 
 func TestRankMatchNormalized(t *testing.T) {
-	var fuzzyTests = []struct {
+	fuzzyTests := []struct {
 		source string
 		target string
 		rank   int
@@ -197,7 +197,7 @@ func TestRankMatchNormalized(t *testing.T) {
 }
 
 func TestRankMatchNormalizedFold(t *testing.T) {
-	var fuzzyTests = []struct {
+	fuzzyTests := []struct {
 		source string
 		target string
 		rank   int
@@ -226,14 +226,14 @@ func TestRankMatchNormalizedFoldConcurrent(t *testing.T) {
 	done := make(chan empty)
 	for i := 0; i <= procs; i++ {
 		go func() {
-			for n := 0; n < iter; n++ {
+			for range iter {
 				_ = RankFindNormalizedFold(source, target)
 			}
 			done <- empty{}
 		}()
 	}
 	cnt := 0
-	for i := 0; i < procs; i++ {
+	for range procs {
 		<-done
 		cnt++
 	}
@@ -315,42 +315,42 @@ func TestSortingRanks(t *testing.T) {
 
 func BenchmarkMatch(b *testing.B) {
 	ft := fuzzyTests[2]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Match(ft.source, ft.target)
 	}
 }
 
 func BenchmarkMatchBigLate(b *testing.B) {
 	ft := fuzzyTests[0]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Match(ft.source, ft.target)
 	}
 }
 
 func BenchmarkMatchBigEarly(b *testing.B) {
 	ft := fuzzyTests[1]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Match(ft.source, ft.target)
 	}
 }
 
 func BenchmarkMatchFold(b *testing.B) {
 	ft := fuzzyTests[2]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		MatchFold(ft.source, ft.target)
 	}
 }
 
 func BenchmarkMatchFoldBigLate(b *testing.B) {
 	ft := fuzzyTests[0]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		MatchFold(ft.source, ft.target)
 	}
 }
 
 func BenchmarkMatchFoldBigEarly(b *testing.B) {
 	ft := fuzzyTests[1]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		MatchFold(ft.source, ft.target)
 	}
 }
@@ -364,7 +364,7 @@ func BenchmarkFindFold(b *testing.B) {
 func benchmarkFindFold(b *testing.B, ft fuzzyTest) {
 	src := ft.source
 	var tgts []string
-	for i := 0; i < 128; i++ {
+	for range 128 {
 		tgts = append(tgts, ft.target)
 	}
 	b.ResetTimer()
@@ -375,21 +375,21 @@ func benchmarkFindFold(b *testing.B, ft fuzzyTest) {
 
 func BenchmarkRankMatch(b *testing.B) {
 	ft := fuzzyTests[2]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RankMatch(ft.source, ft.target)
 	}
 }
 
 func BenchmarkRankMatchBigLate(b *testing.B) {
 	ft := fuzzyTests[0]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RankMatch(ft.source, ft.target)
 	}
 }
 
 func BenchmarkRankMatchBigEarly(b *testing.B) {
 	ft := fuzzyTests[1]
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RankMatch(ft.source, ft.target)
 	}
 }
@@ -412,6 +412,29 @@ func ExampleRankMatch() {
 func ExampleRankFind() {
 	fmt.Printf("%+v", RankFind("whl", []string{"cartwheel", "foobar", "wheel", "baz"}))
 	// Output: [{Source:whl Target:cartwheel Distance:6 OriginalIndex:0} {Source:whl Target:wheel Distance:2 OriginalIndex:2}]
+}
+
+func TestRankMatchTransformedLength(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		rank           func(string, string) int
+		source, target string
+		want           int
+	}{
+		{"normalized equal", RankMatchNormalized, "é", "e", 0},
+		{"normalized subsequence", RankMatchNormalized, "éé", "eze", 1},
+		{"normalized combining", RankMatchNormalized, "e\u0301", "e", 0},
+		{"folded equal", RankMatchFold, "K", "k", 0},
+		{"folded subsequence", RankMatchFold, "KK", "kzk", 1},
+		{"normalized folded", RankMatchNormalizedFold, "ÉÉ", "eze", 1},
+		{"not a match", RankMatchNormalized, "éé", "e", -1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.rank(test.source, test.target); got != test.want {
+				t.Errorf("rank(%q, %q) = %d, want %d", test.source, test.target, got, test.want)
+			}
+		})
+	}
 }
 
 func TestMatchInvalidUTF8(t *testing.T) {
